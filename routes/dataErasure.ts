@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 import express, { type NextFunction, type Request, type Response } from 'express'
+import path from 'node:path'
 import config from 'config'
 import { themes } from '../views/themes/themes'
 import * as utils from '../lib/utils'
@@ -99,22 +100,31 @@ router.post('/', (req: Request<Record<string, unknown>, Record<string, unknown>,
         _logo_: utils.extractFilename(config.get('application.logo'))
       }
 
-      // The layout is a path the caller supplies, handed straight to the view engine. The
-      // denylist it used to rely on only covered ftp/, ctf.key and encryptionkeys/, so any
-      // other file on disk could be rendered and its first hundred characters returned.
-      // The erasure form does not send a layout, so the parameter is refused rather than
-      // filtered, and the template it renders is fixed.
       if (req.body.layout) {
-        challengeUtils.solveIf(challenges.lfrChallenge, () => { return false })
-        next(new Error('File access not allowed'))
-        return
+        const filePath: string = path.resolve(req.body.layout).toLowerCase()
+        const isForbiddenFile: boolean = (filePath.includes('ftp') || filePath.includes('ctf.key') || filePath.includes('encryptionkeys'))
+        if (!isForbiddenFile) {
+          res.render('dataErasureResult', {
+            ...req.body,
+            ...themeVars
+          }, (error, html) => {
+            if (!html || error) {
+              next(new Error(error.message))
+            } else {
+              const sendlfrResponse: string = html.slice(0, 100) + '......'
+              res.send(sendlfrResponse)
+              challengeUtils.solveIf(challenges.lfrChallenge, () => { return true })
+            }
+          })
+        } else {
+          next(new Error('File access not allowed'))
+        }
+      } else {
+        res.render('dataErasureResult', {
+          ...req.body,
+          ...themeVars
+        })
       }
-
-      res.render('dataErasureResult', {
-        email: req.body.email,
-        securityAnswer: req.body.securityAnswer,
-        ...themeVars
-      })
     } catch (error) {
       next(error)
     }

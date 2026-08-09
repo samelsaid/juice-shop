@@ -3,29 +3,15 @@ import * as challengeUtils from '../lib/challengeUtils'
 import * as utils from '../lib/utils'
 import { challenges } from '../data/datacache'
 
-// The seed phrase that used to be written out here derived the very key this endpoint
-// checks for, and the phrase travelled with the source, so the key it protects was known
-// to anybody holding a copy. The wallet is generated once per process instead: the check
-// and its hints behave exactly as before, the key simply is not written down anywhere.
-let walletPromise: Promise<{ privateKey: string, publicKey: string, address: string }> | null = null
-
-async function juicyNftWallet () {
-  if (walletPromise === null) {
-    walletPromise = import('ethers').then(({ Wallet }) => {
-      const wallet = Wallet.createRandom()
-      return { privateKey: wallet.privateKey, publicKey: wallet.publicKey, address: wallet.address }
-    }).catch((error: unknown) => {
-      walletPromise = null
-      throw error
-    })
-  }
-  return await walletPromise
-}
-
 export function checkKeys () {
   return async (req: Request, res: Response) => {
     try {
-      const { privateKey, publicKey, address } = await juicyNftWallet()
+      const { HDNodeWallet } = await import('ethers')
+      const mnemonic = 'purpose betray marriage blame crunch monitor spin slide donate sport lift clutch'
+      const mnemonicWallet = HDNodeWallet.fromPhrase(mnemonic)
+      const privateKey = mnemonicWallet.privateKey
+      const publicKey = mnemonicWallet.publicKey
+      const address = mnemonicWallet.address
       challengeUtils.solveIf(challenges.nftUnlockChallenge, () => {
         return req.body.privateKey === privateKey
       })

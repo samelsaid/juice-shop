@@ -46,23 +46,29 @@ const UserModelInit = (sequelize: Sequelize) => { // vuln-code-snippet start wea
         type: DataTypes.STRING,
         defaultValue: '',
         set (username: string) {
-          this.setDataValue('username', security.sanitizeSecure(username))
+          if (utils.isChallengeEnabled(challenges.persistedXssUserChallenge)) {
+            username = security.sanitizeLegacy(username)
+          } else {
+            username = security.sanitizeSecure(username)
+          }
+          this.setDataValue('username', username)
         }
       },
       email: {
         type: DataTypes.STRING,
         unique: true,
         set (email: string) {
-          const sanitizedEmail = security.sanitizeSecure(email)
-          // Judge what actually gets persisted, not what arrived - otherwise the mere
-          // submission of markup counts even though nothing dangerous is ever stored.
-          challengeUtils.solveIf(challenges.persistedXssUserChallenge, () => {
-            return utils.contains(
-              sanitizedEmail,
-              '<iframe src="javascript:alert(`xss`)">'
-            )
-          })
-          this.setDataValue('email', sanitizedEmail)
+          if (utils.isChallengeEnabled(challenges.persistedXssUserChallenge)) {
+            challengeUtils.solveIf(challenges.persistedXssUserChallenge, () => {
+              return utils.contains(
+                email,
+                '<iframe src="javascript:alert(`xss`)">'
+              )
+            })
+          } else {
+            email = security.sanitizeSecure(email)
+          }
+          this.setDataValue('email', email)
         }
       }, // vuln-code-snippet hide-end
       password: {
